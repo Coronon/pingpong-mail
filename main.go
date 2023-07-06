@@ -41,7 +41,8 @@ func recipientChecker(peer smtpd.Peer, addr string) error {
 	return nil
 }
 
-func handler(peer smtpd.Peer, env smtpd.Envelope) error {
+// Initial handler for all incoming mail
+func handleIncoming(peer smtpd.Peer, env smtpd.Envelope) error {
 	var err error
 
 	parsedMail, err := mail.ReadMessage(bytes.NewReader(env.Data))
@@ -51,7 +52,12 @@ func handler(peer smtpd.Peer, env smtpd.Envelope) error {
 	}
 
 	// Check subject
-	if *forcedSubject != "" && strings.HasPrefix(parsedMail.Header.Get("Subject"), *forcedSubject) {
+	zap.S().Debugw("Checking subject",
+		"subject", parsedMail.Header.Get("Subject"),
+		"forced", *forcedSubject,
+	)
+	if *forcedSubject != "" && !strings.HasPrefix(parsedMail.Header.Get("Subject"), *forcedSubject) {
+		zap.S().Debug("Subject check failed")
 		return fmt.Errorf("please start your subject with '%v'", *forcedSubject)
 	}
 
@@ -114,6 +120,11 @@ func handler(peer smtpd.Peer, env smtpd.Envelope) error {
 	return nil
 }
 
+// Handler for accepted email (passed DMARC so we know people _actually_ want a response)
+func handleAccepted(mail *mail.Message, returnAddr string) {
+
+}
+
 func init() {
 	// Setup logging
 	cfg := zap.NewProductionConfig()
@@ -140,7 +151,7 @@ func main() {
 	server := &smtpd.Server{
 		WelcomeMessage:   *welcomeMsg,
 		RecipientChecker: recipientChecker,
-		Handler:          handler,
+		Handler:          handleIncoming,
 	}
 
 	zap.S().Infof("Starting server on %v...", *inAddr)
