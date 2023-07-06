@@ -162,11 +162,11 @@ func handleAccepted(email *mail.Message, recipientAddr string, returnAddr string
 	// Find MX server
 	mxRecords, err := net.LookupMX(returnDomain)
 	if err != nil {
-		zap.S().Info("Can't lookup MX records", "domain", returnDomain)
+		zap.S().Infow("Can't lookup MX records", "domain", returnDomain)
 		return
 	}
 	if len(mxRecords) == 0 {
-		zap.S().Info("No MX records found", "domain", returnDomain)
+		zap.S().Infow("No MX records found", "domain", returnDomain)
 		return
 	}
 	zap.S().Debugw("Found MX records",
@@ -193,7 +193,7 @@ func handleAccepted(email *mail.Message, recipientAddr string, returnAddr string
 		err = sender.Send(replyFrom, recipients, m)
 		sender.Close()
 		if err == nil {
-			zap.S().Info("Sent reply", "to", returnAddr)
+			zap.S().Infow("Sent reply", "to", returnAddr)
 			return
 		} else {
 			zap.S().Debugw("Error sending reply", "error", err)
