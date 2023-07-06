@@ -183,7 +183,7 @@ func handleAccepted(email *mail.Message, recipientAddr string, returnAddr string
 			"mx_pref", mx.Pref,
 		)
 
-		d := gomail.Dialer{Host: mx.Host, Port: 587, LocalName: *serverName}
+		d := gomail.Dialer{Host: mx.Host, Port: 25, LocalName: *serverName}
 		sender, err := d.Dial()
 		if err != nil {
 			zap.S().Debugw("Could not dial", "error", err)
