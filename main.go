@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"net/mail"
+	"strings"
 
 	"github.com/chrj/smtpd"
 	"github.com/emersion/go-msgauth/dmarc"
@@ -13,10 +14,11 @@ import (
 )
 
 var (
-	isVerbose  = flag.Bool("v", false, "Enable debug output (might include sensitive data!)")
-	welcomeMsg = flag.String("welcome", "PingPong email tester", "Welcome message for SMTP session")
-	inAddr     = flag.String("inaddr", "localhost:25", "Address to listen for incoming SMTP on")
-	inbox      = flag.String("inbox", "*", "Inbox address to receive email for")
+	isVerbose     = flag.Bool("v", false, "Enable debug output (might include sensitive data!)")
+	welcomeMsg    = flag.String("welcome", "PingPong email tester", "Welcome message for SMTP session")
+	inAddr        = flag.String("inaddr", "localhost:25", "Address to listen for incoming SMTP on")
+	inbox         = flag.String("inbox", "*", "Inbox address to receive email for")
+	forcedSubject = flag.String("subject", "", "Force some string at the beginning of subjects")
 )
 
 var (
@@ -46,6 +48,11 @@ func handler(peer smtpd.Peer, env smtpd.Envelope) error {
 	if err != nil {
 		zap.S().Debugw("Can't parse email body", "error", err)
 		return ErrCantParseBody
+	}
+
+	// Check subject
+	if *forcedSubject != "" && strings.HasPrefix(parsedMail.Header.Get("Subject"), *forcedSubject) {
+		return fmt.Errorf("please start your subject with '%v'", *forcedSubject)
 	}
 
 	//? To avoid becoming a spammer for people that spoof the sender address for
