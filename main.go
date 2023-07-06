@@ -19,6 +19,7 @@ import (
 var (
 	isVerbose     = flag.Bool("v", false, "Enable debug output (might include sensitive data!)")
 	welcomeMsg    = flag.String("welcome", "PingPong email tester", "Welcome message for SMTP session")
+	serverName    = flag.String("serverName", "localhost", "Name used in HELO/EHLO command when sending reply")
 	inAddr        = flag.String("inaddr", "localhost:25", "Address to listen for incoming SMTP on")
 	inbox         = flag.String("inbox", "*", "Inbox address to receive email for")
 	replyAddr     = flag.String("replyAddr", "", "E-Mail address to send responses from (default: first recipient)")
@@ -182,7 +183,7 @@ func handleAccepted(email *mail.Message, recipientAddr string, returnAddr string
 			"mx_pref", mx.Pref,
 		)
 
-		d := gomail.Dialer{Host: mx.Host, Port: 587}
+		d := gomail.Dialer{Host: mx.Host, Port: 587, LocalName: *serverName}
 		sender, err := d.Dial()
 		if err != nil {
 			zap.S().Debugw("Could not dial", "error", err)
