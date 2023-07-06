@@ -5,12 +5,15 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
+	"net"
 	"net/mail"
 	"strings"
 
 	"github.com/chrj/smtpd"
 	"github.com/emersion/go-msgauth/dmarc"
 	"go.uber.org/zap"
+	"gopkg.in/gomail.v2"
 )
 
 var (
@@ -18,6 +21,9 @@ var (
 	welcomeMsg    = flag.String("welcome", "PingPong email tester", "Welcome message for SMTP session")
 	inAddr        = flag.String("inaddr", "localhost:25", "Address to listen for incoming SMTP on")
 	inbox         = flag.String("inbox", "*", "Inbox address to receive email for")
+	replyAddr     = flag.String("replyAddr", "", "E-Mail address to send responses from (default: first recipient)")
+	replySubject  = flag.String("replySubject", "PONG - {ORIGINAL_SUBJECT}", "Subject to reply with")
+	replyMsg      = flag.String("replyMsg", "PONG in response to:\n\n{ORIGINAL_MSG}", "Text to reply with")
 	forcedSubject = flag.String("subject", "", "Force some string at the beginning of subjects")
 )
 
@@ -117,12 +123,81 @@ func handleIncoming(peer smtpd.Peer, env smtpd.Envelope) error {
 	// Handle email
 	zap.S().Debugf("Will handle email :)")
 
+	go handleAccepted(parsedMail, env.Recipients[0], env.Sender, senderDomain)
+
 	return nil
 }
 
 // Handler for accepted email (passed DMARC so we know people _actually_ want a response)
-func handleAccepted(mail *mail.Message, returnAddr string) {
+func handleAccepted(email *mail.Message, recipientAddr string, returnAddr string, returnDomain string) {
+	// Decide address to reply from
+	var replyFrom string
+	if *replyAddr != "" {
+		replyFrom = *replyAddr
+	} else {
+		replyFrom = recipientAddr
+	}
 
+	// Build new recipients
+	recipients := make([]string, 1)
+	recipients[0] = returnAddr
+
+	// Build response subject
+	subject := strings.ReplaceAll(*replySubject, "{ORIGINAL_SUBJECT}", email.Header.Get("Subject"))
+
+	// Build response message
+	origMsg := new(strings.Builder)
+	io.Copy(origMsg, email.Body)
+
+	msg := strings.ReplaceAll(*replyMsg, "{ORIGINAL_MSG}", origMsg.String())
+	zap.S().Debugw("Prepared response", "msg", msg)
+
+	m := gomail.NewMessage()
+	m.SetHeader("From", replyFrom)
+	m.SetHeader("To", recipientAddr)
+	m.SetHeader("Subject", subject)
+	m.SetBody("text/plain", msg)
+
+	// Find MX server
+	mxRecords, err := net.LookupMX(returnDomain)
+	if err != nil {
+		zap.S().Info("Can't lookup MX records", "domain", returnDomain)
+		return
+	}
+	if len(mxRecords) == 0 {
+		zap.S().Info("No MX records found", "domain", returnDomain)
+		return
+	}
+	zap.S().Debugw("Found MX records",
+		"domain", returnDomain,
+		"records", mxRecords,
+	)
+
+	for _, mx := range mxRecords {
+		zap.S().Debugw("Trying to send email",
+			"from", replyFrom,
+			"address", returnAddr,
+			"domain", returnDomain,
+			"mx_host", mx.Host,
+			"mx_pref", mx.Pref,
+		)
+
+		d := gomail.Dialer{Host: mx.Host, Port: 587}
+		sender, err := d.Dial()
+		if err != nil {
+			zap.S().Debugw("Could not dial", "error", err)
+			continue
+		}
+
+		err = sender.Send(replyFrom, recipients, m)
+		sender.Close()
+		if err == nil {
+			zap.S().Info("Sent reply", "to", returnAddr)
+			return
+		} else {
+			zap.S().Debugw("Error sending reply", "error", err)
+		}
+	}
 }
 
 func init() {
