@@ -1,4 +1,4 @@
-module github.com/coronon/pingpong-email
+module github.com/coronon/pingpong-mail
 
 go 1.20
 
