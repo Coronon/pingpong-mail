@@ -23,7 +23,7 @@ RUN set -eux; go mod download; go mod verify
 # Copy app source code (except anything in .dockerignore).
 COPY . .
 
-# Build app.
+# Build app (statically linked).
 RUN set -eux; CGO_ENABLED=0 go build -ldflags="-w -s" -o pingpong-mail ./cmd/pingpong-mail
 
 #* Deploy
