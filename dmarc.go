@@ -4,14 +4,76 @@ import (
 	"bytes"
 	"fmt"
 	"net"
+	"net/mail"
 	"strings"
 
 	"blitiri.com.ar/go/spf"
 	"github.com/chrj/smtpd"
 	"github.com/emersion/go-msgauth/dkim"
 	"github.com/emersion/go-msgauth/dmarc"
+	"go.uber.org/zap"
 	"golang.org/x/net/publicsuffix"
 )
+
+// Fully validate DMARC compliance including alignment
+func checkDmarc(
+	peer *smtpd.Peer,
+	env *smtpd.Envelope,
+	parsedMail *mail.Message,
+	senderDomain string,
+) error {
+	// Determine sender <From:> header domain
+	fromHeaderParsed, err := getFromAddress(parsedMail.Header.Get("From"))
+	if err != nil {
+		zap.S().Debugw("Can't get <From:> address", "error", err)
+		return err
+	}
+	fromHeaderAddr := getDomainOrFallback(fromHeaderParsed, "")
+	if fromHeaderAddr == "" {
+		zap.S().Debugw("Can't get <From:> domain", "error", err)
+		return ErrFromHeaderInvalid
+	}
+
+	zap.S().Debugf("Sender domain: %v, From header: %v\n", senderDomain, fromHeaderAddr)
+
+	// Check DMARC framework
+	dmarcRecord, err := dmarc.Lookup(senderDomain)
+	if err != nil {
+		zap.S().Debugw("DMARC lookup failed", "error", err)
+		return ErrDMARCFailed
+	}
+
+	validSPFDomain, err := getValidSPF(peer, env)
+	if err != nil {
+		zap.S().Debugw("SPF validation failed", "error", err)
+		return err
+	}
+	isSPFValid := checkAlignment(fromHeaderAddr, validSPFDomain, dmarcRecord.SPFAlignment)
+
+	validDKIMDomains, err := getValidDKIM(peer, env)
+	if err != nil {
+		zap.S().Debugw("DKIM validation failed", "error", err)
+		return err
+	}
+	isDKIMValid := false
+	for i := range validDKIMDomains {
+		if checkAlignment(fromHeaderAddr, validDKIMDomains[i], dmarcRecord.DKIMAlignment) {
+			isDKIMValid = true
+			break
+		}
+	}
+
+	zap.S().Debugf("SPF valid: %v, DKIM valid: %v -> %v\n", isSPFValid, isDKIMValid, isSPFValid || isDKIMValid)
+
+	if !isSPFValid && !isDKIMValid {
+		zap.S().Debug("DMARC validation failed")
+		return ErrDMARCFailed
+	}
+
+	// All checks passed -> no error
+	zap.S().Debug("DMARC passed")
+	return nil
+}
 
 // Get domain with valid SPF record
 func getValidSPF(peer *smtpd.Peer, env *smtpd.Envelope) (string, error) {

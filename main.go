@@ -5,14 +5,10 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io"
-	"net"
 	"net/mail"
 	"strings"
-	"time"
 
 	"github.com/chrj/smtpd"
-	"github.com/emersion/go-msgauth/dmarc"
 	"go.uber.org/zap"
 	"gopkg.in/gomail.v2"
 )
@@ -72,52 +68,10 @@ func handleIncoming(peer smtpd.Peer, env smtpd.Envelope) error {
 	//? To avoid becoming a spammer for people that spoof the sender address for
 	//? us to reply to, we require a DMARC pass! No DMARC -> no reply!
 	if config.EnableDmarc {
-		// Determine sender <From:> header domain
-		fromHeaderParsed, err := getFromAddress(parsedMail.Header.Get("From"))
+		zap.S().Debug("Checking DMARC")
+		err := checkDmarc(&peer, &env, parsedMail, senderDomain)
 		if err != nil {
-			zap.S().Debugw("Can't get <From:> address", "error", err)
 			return err
-		}
-		fromHeaderAddr := getDomainOrFallback(fromHeaderParsed, "")
-		if fromHeaderAddr == "" {
-			zap.S().Debugw("Can't get <From:> domain", "error", err)
-			return ErrFromHeaderInvalid
-		}
-
-		zap.S().Debugf("Sender domain: %v, From header: %v\n", senderDomain, fromHeaderAddr)
-
-		// Check DMARC framework
-		dmarcRecord, err := dmarc.Lookup(senderDomain)
-		if err != nil {
-			zap.S().Debugw("DMARC lookup failed", "error", err)
-			return ErrDMARCFailed
-		}
-
-		validSPFDomain, err := getValidSPF(&peer, &env)
-		if err != nil {
-			zap.S().Debugw("SPF validation failed", "error", err)
-			return err
-		}
-		isSPFValid := checkAlignment(fromHeaderAddr, validSPFDomain, dmarcRecord.SPFAlignment)
-
-		validDKIMDomains, err := getValidDKIM(&peer, &env)
-		if err != nil {
-			zap.S().Debugw("DKIM validation failed", "error", err)
-			return err
-		}
-		isDKIMValid := false
-		for i := range validDKIMDomains {
-			if checkAlignment(fromHeaderAddr, validDKIMDomains[i], dmarcRecord.DKIMAlignment) {
-				isDKIMValid = true
-				break
-			}
-		}
-
-		zap.S().Debugf("SPF valid: %v, DKIM valid: %v -> %v\n", isSPFValid, isDKIMValid, isSPFValid || isDKIMValid)
-
-		if !isSPFValid && !isDKIMValid {
-			zap.S().Debugf("Will reject email :(")
-			return ErrDMARCFailed
 		}
 	}
 
@@ -144,36 +98,24 @@ func handleAccepted(email *mail.Message, recipientAddr string, returnAddr string
 	recipients[0] = returnAddr
 
 	// Build response subject
-	subject := strings.ReplaceAll(config.ReplySubject, "{ORIG_SUBJ}", email.Header.Get("Subject"))
+	subject := buildReplySubject(email.Header.Get("Subject"))
 
 	// Build response message
-	origMsg := new(strings.Builder)
-	io.Copy(origMsg, email.Body)
+	body := buildReplyBody(email)
+	zap.S().Debugw("Prepared response", "subject", subject, "body", body)
 
-	msg := strings.ReplaceAll(config.ReplyMessage, "{ORIG_BODY}", origMsg.String())
-	msg = strings.ReplaceAll(msg, "{TIME}", time.Now().UTC().Format(time.RFC3339))
-	zap.S().Debugw("Prepared response", "msg", msg)
-
+	// Build response mail
 	m := gomail.NewMessage()
 	m.SetHeader("From", replyFrom)
 	m.SetHeader("To", recipientAddr)
 	m.SetHeader("Subject", subject)
-	m.SetBody("text/plain", msg)
+	m.SetBody("text/plain", body)
 
 	// Find MX server
-	mxRecords, err := net.LookupMX(returnDomain)
-	if err != nil {
-		zap.S().Infow("Can't lookup MX records", "domain", returnDomain)
-		return
-	}
+	mxRecords := getMXDomains(returnDomain)
 	if len(mxRecords) == 0 {
-		zap.S().Infow("No MX records found", "domain", returnDomain)
 		return
 	}
-	zap.S().Debugw("Found MX records",
-		"domain", returnDomain,
-		"records", mxRecords,
-	)
 
 	for _, mx := range mxRecords {
 		for _, port := range config.DeliveryPorts {
@@ -190,6 +132,7 @@ func handleAccepted(email *mail.Message, recipientAddr string, returnAddr string
 			sender, err := d.Dial()
 			if err != nil {
 				zap.S().Debugw("Could not dial", "error", err)
+				// Attempt other mx:port combination
 				continue
 			}
 
