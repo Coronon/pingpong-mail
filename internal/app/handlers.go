@@ -52,6 +52,8 @@ func HandleIncoming(peer smtpd.Peer, env smtpd.Envelope) error {
 	senderDomain := util.GetDomainOrFallback(env.Sender, peer.HeloName)
 
 	// Determine sender <From:> address
+	// This is also the address we will reply to -> honouring Reply-To could open
+	// up attack vectors
 	fromHeaderAddr, err := util.GetRawFromHeaderAddress(parsedMail.Header.Get("From"))
 	if err != nil {
 		zap.S().Debugw("Can't get <From:> address", "error", err)
@@ -79,24 +81,24 @@ func HandleIncoming(peer smtpd.Peer, env smtpd.Envelope) error {
 	// Handle email
 	zap.S().Debugf("Will handle email :)")
 
-	go handleAccepted(parsedMail, env.Recipients[0], env.Sender, senderDomain)
+	go handleAccepted(parsedMail, env.Recipients[0], fromHeaderAddr)
 
 	return nil
 }
 
 // Handler for accepted email (passed all checks)
-func handleAccepted(email *mail.Message, recipientAddr string, returnAddr string, returnDomain string) {
+func handleAccepted(email *mail.Message, incomingRcptAddr string, outgoingRcptAddr string) {
 	// Decide address to reply from
 	var replyFrom string
 	if config.Cnf.ReplyAddress != "" {
 		replyFrom = config.Cnf.ReplyAddress
 	} else {
-		replyFrom = recipientAddr
+		replyFrom = incomingRcptAddr
 	}
 
 	// Build new recipients
 	recipients := make([]string, 1)
-	recipients[0] = returnAddr
+	recipients[0] = outgoingRcptAddr
 
 	// Build response subject
 	subject := reply.BuildReplySubject(email.Header.Get("Subject"))
@@ -108,12 +110,17 @@ func handleAccepted(email *mail.Message, recipientAddr string, returnAddr string
 	// Build response mail
 	m := gomail.NewMessage()
 	m.SetHeader("From", replyFrom)
-	m.SetHeader("To", recipientAddr)
+	m.SetHeader("To", incomingRcptAddr)
 	m.SetHeader("Subject", subject)
 	m.SetBody("text/plain", body)
 
 	// Find MX server
-	mxRecords := util.GetMXDomains(returnDomain)
+	outgoingRcptDomain := util.GetDomainOrFallback(outgoingRcptAddr, "")
+	if outgoingRcptDomain == "" {
+		zap.S().Debugw("Could not determine domain for address", "address", outgoingRcptAddr)
+		return
+	}
+	mxRecords := util.GetMXDomains(outgoingRcptDomain)
 	if len(mxRecords) == 0 {
 		return
 	}
@@ -122,8 +129,8 @@ func handleAccepted(email *mail.Message, recipientAddr string, returnAddr string
 		for _, port := range config.Cnf.DeliveryPorts {
 			zap.S().Debugw("Trying to send email",
 				"from", replyFrom,
-				"address", returnAddr,
-				"domain", returnDomain,
+				"address", outgoingRcptAddr,
+				"domain", outgoingRcptDomain,
 				"mx_host", mx.Host,
 				"mx_pref", mx.Pref,
 				"port", port,
@@ -142,7 +149,7 @@ func handleAccepted(email *mail.Message, recipientAddr string, returnAddr string
 			err = sender.Send(replyFrom, recipients, m)
 			sender.Close()
 			if err == nil {
-				zap.S().Infow("Sent reply", "to", returnAddr)
+				zap.S().Infow("Sent reply", "to", outgoingRcptAddr)
 			} else {
 				zap.S().Debugw("Error sending reply", "error", err)
 			}
