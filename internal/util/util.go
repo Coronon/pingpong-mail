@@ -9,7 +9,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// Detmine the domain of an email sender or fallback
+// Detmine the domain of an email sender or fallback.
 // While technically an address could have multiple '@' signs, we will fallback
 // if there isn't exactly one!
 func GetDomainOrFallback(address string, fallback string) string {

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"net"
-	"net/mail"
 	"strings"
 
 	"blitiri.com.ar/go/spf"
@@ -21,23 +20,9 @@ import (
 func CheckDmarc(
 	peer *smtpd.Peer,
 	env *smtpd.Envelope,
-	parsedMail *mail.Message,
+	fromHeaderDomain string,
 	senderDomain string,
 ) error {
-	// Determine sender <From:> header domain
-	fromHeaderParsed, err := util.GetRawFromHeaderAddress(parsedMail.Header.Get("From"))
-	if err != nil {
-		zap.S().Debugw("Can't get <From:> address", "error", err)
-		return err
-	}
-	fromHeaderAddr := util.GetDomainOrFallback(fromHeaderParsed, "")
-	if fromHeaderAddr == "" {
-		zap.S().Debugw("Can't get <From:> domain", "error", err)
-		return config.ErrFromHeaderInvalid
-	}
-
-	zap.S().Debugf("Sender domain: %v, From header: %v\n", senderDomain, fromHeaderAddr)
-
 	// Check DMARC framework
 	dmarcRecord, err := dmarc.Lookup(senderDomain)
 	if err != nil {
@@ -50,7 +35,7 @@ func CheckDmarc(
 		zap.S().Debugw("SPF validation failed", "error", err)
 		return err
 	}
-	isSPFValid := checkAlignment(fromHeaderAddr, validSPFDomain, dmarcRecord.SPFAlignment)
+	isSPFValid := checkAlignment(fromHeaderDomain, validSPFDomain, dmarcRecord.SPFAlignment)
 
 	validDKIMDomains, err := getValidDKIM(peer, env)
 	if err != nil {
@@ -59,7 +44,7 @@ func CheckDmarc(
 	}
 	isDKIMValid := false
 	for i := range validDKIMDomains {
-		if checkAlignment(fromHeaderAddr, validDKIMDomains[i], dmarcRecord.DKIMAlignment) {
+		if checkAlignment(fromHeaderDomain, validDKIMDomains[i], dmarcRecord.DKIMAlignment) {
 			isDKIMValid = true
 			break
 		}
@@ -130,30 +115,30 @@ func getValidDKIM(peer *smtpd.Peer, env *smtpd.Envelope) ([]string, error) {
 
 // Validate alignment between the <FROM:> header and a validated SPF/DKIM domain
 func checkAlignment(
-	fromHeaderAddr string,
-	validatedAddr string,
+	fromHeaderDomain string,
+	validatedDomain string,
 	mode dmarc.AlignmentMode,
 ) bool {
 	// Validated address may not be empty
-	if validatedAddr == "" {
+	if validatedDomain == "" {
 		return false
 	}
 
 	// Strict mode -> exact match
 	if mode == dmarc.AlignmentStrict {
-		return strings.EqualFold(fromHeaderAddr, validatedAddr)
+		return strings.EqualFold(fromHeaderDomain, validatedDomain)
 	}
 
 	// Relaxed mode -> main domain match
-	fromHeaderDomain, err := publicsuffix.EffectiveTLDPlusOne(fromHeaderAddr)
+	fromHeaderBaseDomain, err := publicsuffix.EffectiveTLDPlusOne(fromHeaderDomain)
 	if err != nil {
 		return false
 	}
 
-	validatedDomain, err := publicsuffix.EffectiveTLDPlusOne(validatedAddr)
+	validatedBaseDomain, err := publicsuffix.EffectiveTLDPlusOne(validatedDomain)
 	if err != nil {
 		return false
 	}
 
-	return strings.EqualFold(fromHeaderDomain, validatedDomain)
+	return strings.EqualFold(fromHeaderBaseDomain, validatedBaseDomain)
 }
