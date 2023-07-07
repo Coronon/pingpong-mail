@@ -2,7 +2,6 @@ package dmarc
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"net"
 	"net/mail"
@@ -10,18 +9,12 @@ import (
 
 	"blitiri.com.ar/go/spf"
 	"github.com/chrj/smtpd"
+	"github.com/coronon/pingpong-mail/internal/config"
 	"github.com/coronon/pingpong-mail/internal/util"
 	"github.com/emersion/go-msgauth/dkim"
 	"github.com/emersion/go-msgauth/dmarc"
 	"go.uber.org/zap"
 	"golang.org/x/net/publicsuffix"
-)
-
-var (
-	ErrFromHeaderInvalid = errors.New("<From:> header is invalid")
-	ErrSPFCantValidate   = errors.New("SPF can not be validated")
-	ErrDKIMCantValidate  = errors.New("DKIM can not be validated")
-	ErrDMARCFailed       = errors.New("DMARC failed or sender could not be validated")
 )
 
 // Fully validate DMARC compliance including alignment
@@ -40,7 +33,7 @@ func CheckDmarc(
 	fromHeaderAddr := util.GetDomainOrFallback(fromHeaderParsed, "")
 	if fromHeaderAddr == "" {
 		zap.S().Debugw("Can't get <From:> domain", "error", err)
-		return ErrFromHeaderInvalid
+		return config.ErrFromHeaderInvalid
 	}
 
 	zap.S().Debugf("Sender domain: %v, From header: %v\n", senderDomain, fromHeaderAddr)
@@ -49,7 +42,7 @@ func CheckDmarc(
 	dmarcRecord, err := dmarc.Lookup(senderDomain)
 	if err != nil {
 		zap.S().Debugw("DMARC lookup failed", "error", err)
-		return ErrDMARCFailed
+		return config.ErrDMARCFailed
 	}
 
 	validSPFDomain, err := getValidSPF(peer, env)
@@ -76,7 +69,7 @@ func CheckDmarc(
 
 	if !isSPFValid && !isDKIMValid {
 		zap.S().Debug("DMARC validation failed")
-		return ErrDMARCFailed
+		return config.ErrDMARCFailed
 	}
 
 	// All checks passed -> no error
@@ -97,7 +90,7 @@ func getValidSPF(peer *smtpd.Peer, env *smtpd.Envelope) (string, error) {
 	spfResult, err := spf.CheckHostWithSender(tcpAddr.IP, peer.HeloName, env.Sender)
 	if err != nil && (spfResult == spf.PermError || spfResult == spf.TempError) {
 		// This is not returned if SPF failes, but if it can't even be validated
-		return "", ErrSPFCantValidate
+		return "", config.ErrSPFCantValidate
 	}
 
 	//? Match return the domain that was validated
@@ -118,7 +111,7 @@ func getValidDKIM(peer *smtpd.Peer, env *smtpd.Envelope) ([]string, error) {
 	verifications, err := dkim.Verify(reader)
 	if err != nil {
 		// This is not returned if DKIM failes, but if it can't even be validated
-		return validSignatures, ErrDKIMCantValidate
+		return validSignatures, config.ErrDKIMCantValidate
 	}
 
 	// No signatures -> failed

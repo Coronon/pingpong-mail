@@ -1,17 +1,12 @@
 package util
 
 import (
-	"errors"
 	"net"
 	"net/mail"
 	"strings"
 
+	"github.com/coronon/pingpong-mail/internal/config"
 	"go.uber.org/zap"
-)
-
-var (
-	ErrFromHeaderMissing = errors.New("<From:> header is missing")
-	ErrFromHeaderInvalid = errors.New("<From:> header is invalid")
 )
 
 // Detmine the domain of an email sender or fallback
@@ -31,13 +26,13 @@ func GetDomainOrFallback(address string, fallback string) string {
 func GetFromAddress(fromHeader string) (string, error) {
 	// Check exists
 	if fromHeader == "" {
-		return "", ErrFromHeaderMissing
+		return "", config.ErrFromHeaderMissing
 	}
 
 	// Check valid RFC 5322 address, e.g. "Barry Gibbs <bg@example.com>"
 	fromHeaderParsed, err := mail.ParseAddress(fromHeader)
 	if err != nil {
-		return "", ErrFromHeaderInvalid
+		return "", config.ErrFromHeaderInvalid
 	}
 
 	return fromHeaderParsed.Address, nil

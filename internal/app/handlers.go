@@ -2,7 +2,6 @@ package app
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"net/mail"
 	"strings"
@@ -14,10 +13,6 @@ import (
 	"github.com/coronon/pingpong-mail/internal/util"
 	"go.uber.org/zap"
 	"gopkg.in/gomail.v2"
-)
-
-var (
-	ErrCantParseBody = errors.New("Could not parse message body")
 )
 
 // Check valid recipient (if limited)
@@ -38,7 +33,7 @@ func HandleIncoming(peer smtpd.Peer, env smtpd.Envelope) error {
 	parsedMail, err := mail.ReadMessage(bytes.NewReader(env.Data))
 	if err != nil {
 		zap.S().Debugw("Can't parse email body", "error", err)
-		return ErrCantParseBody
+		return config.ErrCantParseBody
 	}
 
 	// Check subject
@@ -74,7 +69,7 @@ func HandleIncoming(peer smtpd.Peer, env smtpd.Envelope) error {
 	return nil
 }
 
-// Handler for accepted email (passed DMARC so we know people _actually_ want a response)
+// Handler for accepted email (passed all checks)
 func handleAccepted(email *mail.Message, recipientAddr string, returnAddr string, returnDomain string) {
 	// Decide address to reply from
 	var replyFrom string

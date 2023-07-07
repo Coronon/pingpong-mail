@@ -1,10 +1,21 @@
 package config
 
 import (
+	"errors"
 	"os"
 
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v2"
+)
+
+// Uniform error messages used throughout the application
+var (
+	ErrCantParseBody     = errors.New("Could not parse message body")
+	ErrFromHeaderMissing = errors.New("<From:> header is missing")
+	ErrFromHeaderInvalid = errors.New("<From:> header is invalid")
+	ErrSPFCantValidate   = errors.New("SPF can not be validated")
+	ErrDKIMCantValidate  = errors.New("DKIM can not be validated")
+	ErrDMARCFailed       = errors.New("DMARC failed or sender could not be validated")
 )
 
 // Current configuration of the application
