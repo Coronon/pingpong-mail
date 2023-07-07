@@ -3,12 +3,14 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 
 	"github.com/chrj/smtpd"
 	"go.uber.org/zap"
 
 	"github.com/coronon/pingpong-mail/internal/app"
 	"github.com/coronon/pingpong-mail/internal/config"
+	"github.com/coronon/pingpong-mail/internal/util"
 )
 
 var (
@@ -32,6 +34,7 @@ func main() {
 	// Load configuration
 	config.Cnf = config.ReadConfig(*configPath)
 
+	var protocolLogger *log.Logger
 	// Setup verbose logging
 	if *isVerbose {
 		verboseCfg := zap.NewDevelopmentConfig()
@@ -40,6 +43,8 @@ func main() {
 		defer verboseLogger.Sync()
 
 		zap.ReplaceGlobals(verboseLogger)
+
+		protocolLogger = log.New(util.ZapLogWrapper{}, "", 0)
 	}
 
 	// Start STMP server
@@ -47,6 +52,7 @@ func main() {
 		WelcomeMessage:   config.Cnf.SMTPWelcomeMessage,
 		RecipientChecker: app.CheckRecipient,
 		Handler:          app.HandleIncoming,
+		ProtocolLogger:   protocolLogger,
 	}
 
 	bindAddr := fmt.Sprintf("%v:%v", config.Cnf.BindHost, config.Cnf.BindPort)

@@ -59,3 +59,33 @@ func GetMXDomains(domain string) []*net.MX {
 
 	return mxRecords
 }
+
+// Used to pipe normal log.Logger output into the zap logger
+type ZapLogWrapper struct{}
+
+func (_ ZapLogWrapper) Write(p []byte) (n int, err error) {
+	l := len(p)
+	msg := string(p[:l])
+	// The last byte would be the newline the client terminated its command with
+	trimmed := strings.TrimSuffix(msg, "\n")
+
+	// Split into direction (sending/received) and message (text)
+	parts := strings.SplitN(trimmed, ":", 2)
+
+	var direction string
+	var text string
+	if len(parts) == 2 {
+		direction = parts[0]
+		text = parts[1][1:]
+	} else {
+		text = parts[0][1:]
+	}
+
+	// Actually log to output
+	zap.S().Debugw("SMTP",
+		"direction", direction,
+		"text", text,
+	)
+
+	return l, nil
+}
