@@ -51,6 +51,6 @@ func main() {
 
 	bindAddr := fmt.Sprintf("%v:%v", config.Cnf.BindHost, config.Cnf.BindPort)
 
-	zap.S().Infof("Starting server on: ", bindAddr)
+	zap.S().Infof("Starting server on: %v", bindAddr)
 	server.ListenAndServe(bindAddr)
 }
