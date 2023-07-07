@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/mail"
 	"strings"
+	"time"
 
 	"github.com/chrj/smtpd"
 	"github.com/emersion/go-msgauth/dmarc"
@@ -17,16 +18,11 @@ import (
 )
 
 var (
-	isVerbose     = flag.Bool("v", false, "Enable debug output (might include sensitive data!)")
-	welcomeMsg    = flag.String("welcome", "PingPong email tester", "Welcome message for SMTP session")
-	serverName    = flag.String("serverName", "localhost", "Name used in HELO/EHLO command when sending reply")
-	inAddr        = flag.String("inaddr", "localhost:25", "Address to listen for incoming SMTP on")
-	inbox         = flag.String("inbox", "*", "Inbox address to receive email for")
-	replyAddr     = flag.String("replyAddr", "", "E-Mail address to send responses from (default: first recipient)")
-	replySubject  = flag.String("replySubject", "PONG - {ORIGINAL_SUBJECT}", "Subject to reply with")
-	replyMsg      = flag.String("replyMsg", "PONG in response to:\n\n{ORIGINAL_MSG}", "Text to reply with")
-	forcedSubject = flag.String("subject", "", "Force some string at the beginning of subjects")
+	isVerbose  = flag.Bool("v", false, "Enable debug output (might include sensitive data!)")
+	configPath = flag.String("c", "pingpong.yml", "Path to a configuration file to use")
 )
+
+var config Config
 
 var (
 	ErrCantParseBody     = errors.New("Could not parse message body")
@@ -39,9 +35,9 @@ var (
 
 // Check valid recipient (if limited)
 func recipientChecker(peer smtpd.Peer, addr string) error {
-	if *inbox != "*" && addr != *inbox {
+	if config.RestrictInbox != "*" && addr != config.RestrictInbox {
 		zap.S().Debugf("Received email for invalid inbox: %v", addr)
-		return fmt.Errorf("please send your test emails to: %v", *inbox)
+		return fmt.Errorf("please send your test emails to: %v", config.RestrictInbox)
 	}
 	zap.S().Debugf("Received email for valid inbox: %v", addr)
 
@@ -61,64 +57,68 @@ func handleIncoming(peer smtpd.Peer, env smtpd.Envelope) error {
 	// Check subject
 	zap.S().Debugw("Checking subject",
 		"subject", parsedMail.Header.Get("Subject"),
-		"forced", *forcedSubject,
+		"forced", config.ForceSubjectPrefix,
 	)
-	if *forcedSubject != "" && !strings.HasPrefix(parsedMail.Header.Get("Subject"), *forcedSubject) {
+	if config.ForceSubjectPrefix != "" &&
+		!strings.HasPrefix(parsedMail.Header.Get("Subject"), config.ForceSubjectPrefix) {
+
 		zap.S().Debug("Subject check failed")
-		return fmt.Errorf("please start your subject with '%v'", *forcedSubject)
+		return fmt.Errorf("please start your subject with '%v'", config.ForceSubjectPrefix)
 	}
 
-	//? To avoid becoming a spammer for people that spoof the sender address for
-	//? us to reply to, we require a DMARC pass! No DMARC -> no reply!
 	// Detmine sender main domain
 	senderDomain := getDomainOrFallback(env.Sender, peer.HeloName)
 
-	// Determine sender <From:> header domain
-	fromHeaderParsed, err := getFromAddress(parsedMail.Header.Get("From"))
-	if err != nil {
-		zap.S().Debugw("Can't get <From:> address", "error", err)
-		return err
-	}
-	fromHeaderAddr := getDomainOrFallback(fromHeaderParsed, "")
-	if fromHeaderAddr == "" {
-		zap.S().Debugw("Can't get <From:> domain", "error", err)
-		return ErrFromHeaderInvalid
-	}
-
-	zap.S().Debugf("Sender domain: %v, From header: %v\n", senderDomain, fromHeaderAddr)
-
-	// Check DMARC framework
-	dmarcRecord, err := dmarc.Lookup(senderDomain)
-	if err != nil {
-		zap.S().Debugw("DMARC lookup failed", "error", err)
-		return ErrDMARCFailed
-	}
-
-	validSPFDomain, err := getValidSPF(&peer, &env)
-	if err != nil {
-		zap.S().Debugw("SPF validation failed", "error", err)
-		return err
-	}
-	isSPFValid := checkAlignment(fromHeaderAddr, validSPFDomain, dmarcRecord.SPFAlignment)
-
-	validDKIMDomains, err := getValidDKIM(&peer, &env)
-	if err != nil {
-		zap.S().Debugw("DKIM validation failed", "error", err)
-		return err
-	}
-	isDKIMValid := false
-	for i := range validDKIMDomains {
-		if checkAlignment(fromHeaderAddr, validDKIMDomains[i], dmarcRecord.DKIMAlignment) {
-			isDKIMValid = true
-			break
+	//? To avoid becoming a spammer for people that spoof the sender address for
+	//? us to reply to, we require a DMARC pass! No DMARC -> no reply!
+	if config.EnableDmarc {
+		// Determine sender <From:> header domain
+		fromHeaderParsed, err := getFromAddress(parsedMail.Header.Get("From"))
+		if err != nil {
+			zap.S().Debugw("Can't get <From:> address", "error", err)
+			return err
 		}
-	}
+		fromHeaderAddr := getDomainOrFallback(fromHeaderParsed, "")
+		if fromHeaderAddr == "" {
+			zap.S().Debugw("Can't get <From:> domain", "error", err)
+			return ErrFromHeaderInvalid
+		}
 
-	zap.S().Debugf("SPF valid: %v, DKIM valid: %v -> %v\n", isSPFValid, isDKIMValid, isSPFValid || isDKIMValid)
+		zap.S().Debugf("Sender domain: %v, From header: %v\n", senderDomain, fromHeaderAddr)
 
-	if !isSPFValid && !isDKIMValid {
-		zap.S().Debugf("Will reject email :(")
-		return ErrDMARCFailed
+		// Check DMARC framework
+		dmarcRecord, err := dmarc.Lookup(senderDomain)
+		if err != nil {
+			zap.S().Debugw("DMARC lookup failed", "error", err)
+			return ErrDMARCFailed
+		}
+
+		validSPFDomain, err := getValidSPF(&peer, &env)
+		if err != nil {
+			zap.S().Debugw("SPF validation failed", "error", err)
+			return err
+		}
+		isSPFValid := checkAlignment(fromHeaderAddr, validSPFDomain, dmarcRecord.SPFAlignment)
+
+		validDKIMDomains, err := getValidDKIM(&peer, &env)
+		if err != nil {
+			zap.S().Debugw("DKIM validation failed", "error", err)
+			return err
+		}
+		isDKIMValid := false
+		for i := range validDKIMDomains {
+			if checkAlignment(fromHeaderAddr, validDKIMDomains[i], dmarcRecord.DKIMAlignment) {
+				isDKIMValid = true
+				break
+			}
+		}
+
+		zap.S().Debugf("SPF valid: %v, DKIM valid: %v -> %v\n", isSPFValid, isDKIMValid, isSPFValid || isDKIMValid)
+
+		if !isSPFValid && !isDKIMValid {
+			zap.S().Debugf("Will reject email :(")
+			return ErrDMARCFailed
+		}
 	}
 
 	// Handle email
@@ -133,8 +133,8 @@ func handleIncoming(peer smtpd.Peer, env smtpd.Envelope) error {
 func handleAccepted(email *mail.Message, recipientAddr string, returnAddr string, returnDomain string) {
 	// Decide address to reply from
 	var replyFrom string
-	if *replyAddr != "" {
-		replyFrom = *replyAddr
+	if config.ReplyAddress != "" {
+		replyFrom = config.ReplyAddress
 	} else {
 		replyFrom = recipientAddr
 	}
@@ -144,13 +144,14 @@ func handleAccepted(email *mail.Message, recipientAddr string, returnAddr string
 	recipients[0] = returnAddr
 
 	// Build response subject
-	subject := strings.ReplaceAll(*replySubject, "{ORIGINAL_SUBJECT}", email.Header.Get("Subject"))
+	subject := strings.ReplaceAll(config.ReplySubject, "{ORIG_SUBJ}", email.Header.Get("Subject"))
 
 	// Build response message
 	origMsg := new(strings.Builder)
 	io.Copy(origMsg, email.Body)
 
-	msg := strings.ReplaceAll(*replyMsg, "{ORIGINAL_MSG}", origMsg.String())
+	msg := strings.ReplaceAll(config.ReplyMessage, "{ORIG_BODY}", origMsg.String())
+	msg = strings.ReplaceAll(msg, "{TIME}", time.Now().UTC().Format(time.RFC3339))
 	zap.S().Debugw("Prepared response", "msg", msg)
 
 	m := gomail.NewMessage()
@@ -175,28 +176,34 @@ func handleAccepted(email *mail.Message, recipientAddr string, returnAddr string
 	)
 
 	for _, mx := range mxRecords {
-		zap.S().Debugw("Trying to send email",
-			"from", replyFrom,
-			"address", returnAddr,
-			"domain", returnDomain,
-			"mx_host", mx.Host,
-			"mx_pref", mx.Pref,
-		)
+		for _, port := range config.DeliveryPorts {
+			zap.S().Debugw("Trying to send email",
+				"from", replyFrom,
+				"address", returnAddr,
+				"domain", returnDomain,
+				"mx_host", mx.Host,
+				"mx_pref", mx.Pref,
+				"port", port,
+			)
 
-		d := gomail.Dialer{Host: mx.Host, Port: 25, LocalName: *serverName}
-		sender, err := d.Dial()
-		if err != nil {
-			zap.S().Debugw("Could not dial", "error", err)
-			continue
-		}
+			d := gomail.Dialer{Host: mx.Host, Port: port, LocalName: config.ServerName}
+			sender, err := d.Dial()
+			if err != nil {
+				zap.S().Debugw("Could not dial", "error", err)
+				continue
+			}
 
-		err = sender.Send(replyFrom, recipients, m)
-		sender.Close()
-		if err == nil {
-			zap.S().Infow("Sent reply", "to", returnAddr)
+			//? If sending fails we won't retry as that could be seen as 'spammy'
+			//? We know that a connection was established as dialing didn't fail
+			err = sender.Send(replyFrom, recipients, m)
+			sender.Close()
+			if err == nil {
+				zap.S().Infow("Sent reply", "to", returnAddr)
+			} else {
+				zap.S().Debugw("Error sending reply", "error", err)
+			}
+
 			return
-		} else {
-			zap.S().Debugw("Error sending reply", "error", err)
 		}
 	}
 }
@@ -214,6 +221,9 @@ func init() {
 func main() {
 	flag.Parse()
 
+	// Load configuration
+	config = readConfig(*configPath)
+
 	// Setup verbose logging
 	if *isVerbose {
 		verboseCfg := zap.NewDevelopmentConfig()
@@ -224,12 +234,15 @@ func main() {
 		zap.ReplaceGlobals(verboseLogger)
 	}
 
+	// Start STMP server
 	server := &smtpd.Server{
-		WelcomeMessage:   *welcomeMsg,
+		WelcomeMessage:   config.SMTPWelcomeMessage,
 		RecipientChecker: recipientChecker,
 		Handler:          handleIncoming,
 	}
 
-	zap.S().Infof("Starting server on %v...", *inAddr)
-	server.ListenAndServe(*inAddr)
+	bindAddr := fmt.Sprintf("%v:%v", config.BindHost, config.BindPort)
+
+	zap.S().Infof("Starting server on: ", bindAddr)
+	server.ListenAndServe(bindAddr)
 }

@@ -1,0 +1,64 @@
+# Interface to listen on
+# Use 0.0.0.0 to receive connections from all interfaces
+bind_host: localhost
+
+# Port to listen on
+# Most email submission traffic flows through port 587. Port 25 is mainly used
+# for relaying these days.
+bind_port: 587
+
+# Welcome message for SMTP session upon connection from remote
+# Some providers expect the host name of the email server here
+smtp_welcome_message: PingPong email tester
+
+# Canonical hostname for this server used when connecting to a remote MTA in the
+# HELO/EHLO command to identify ourselves
+server_name: mail.ping-pong.email
+
+# Ports to try to deliver replies to in order
+# Should probably be left with the default
+delivery_ports: [587, 2525, 25]
+
+# Restricts addresses that can be used as the `RCPT TO:` (RFC5321)
+# When using the wildcard `*` to allow any recipient address, beware that some
+# services might consider you an open relay for that. Also ensure that you
+# specify `reply_address` to not accidentally impersonate anyone!
+restrict_inbox: check@ping-pong.email
+
+# Force some string at the beginning of received mails subjects
+# Useful when you don't want to service automatic spam emails.
+# All emails without this prefix will be rejected. Leave empty to disable.
+force_subject_prefix: "PING "
+
+# Forces all incoming mail to pass DMARC -> either SPF or DKIM
+# You should definitely leave this enabled when your instance is exposed to the
+# internet to not become a spam origin. People and bots could fake the sender
+# and use the instance effectively as an open relay.
+enable_dmarc: true
+
+# Address used in the `MAIL FROM:` (RFC5321) when replying to emails
+# You probably want to use one from your domain, but can specify anything.
+# Leave this empty to use the first address from `RCPT TO:` (RFC5321) of the
+# email responding to.
+reply_address: check@ping-pong.email
+
+# Address used in the <From:> header when replying to emails
+# RFC 5322 address, e.g. "Barry Gibbs <bg@example.com>"
+reply_from: PingPong Email <check@ping-pong.email>
+
+# Subject used when replying to emails
+# The variable `{ORIG_SUBJ}` will be replaced with the unaltered subject of the
+# received email
+reply_subject: PONG - '{ORIG_SUBJ}'
+
+# Message body used when replying to emails
+# The variable `{ORIG_BODY}` will be replaced with the unaltered body
+# (without headers) of the received email
+# The variable `{TIME}` will be replaced with the current ISO 8601 timestamp
+# You may not want to include the original message as many email clients add
+# content in multiple formats, all ASCII encoded. It should however be fine for
+# automatically generated, plain emails.
+reply_message: |
+  Thank you for using ping-pong.email
+
+  Time: {TIME}
