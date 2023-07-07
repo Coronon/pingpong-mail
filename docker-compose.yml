@@ -1,0 +1,13 @@
+version: "3"
+
+services:
+  pingpong-mail:
+    image: pingpong-mail
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: deploy
+    volumes:
+      - ./pingpong.yml:/pingpong.yml
+    ports:
+      - 127.0.0.1:5025:587

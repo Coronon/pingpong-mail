@@ -1,6 +1,6 @@
 # Interface to listen on
 # Use 0.0.0.0 to receive connections from all interfaces
-bind_host: localhost
+bind_host: 0.0.0.0
 
 # Port to listen on
 # Most email submission traffic flows through port 587. Port 25 is mainly used
