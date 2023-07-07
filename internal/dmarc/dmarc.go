@@ -25,7 +25,7 @@ func CheckDmarc(
 	senderDomain string,
 ) error {
 	// Determine sender <From:> header domain
-	fromHeaderParsed, err := util.GetFromAddress(parsedMail.Header.Get("From"))
+	fromHeaderParsed, err := util.GetRawFromHeaderAddress(parsedMail.Header.Get("From"))
 	if err != nil {
 		zap.S().Debugw("Can't get <From:> address", "error", err)
 		return err

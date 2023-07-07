@@ -23,7 +23,7 @@ func GetDomainOrFallback(address string, fallback string) string {
 }
 
 // Get raw from address from RFC 5322 address
-func GetFromAddress(fromHeader string) (string, error) {
+func GetRawFromHeaderAddress(fromHeader string) (string, error) {
 	// Check exists
 	if fromHeader == "" {
 		return "", config.ErrFromHeaderMissing
