@@ -1,7 +1,8 @@
-package main
+package dmarc
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"net"
 	"net/mail"
@@ -9,26 +10,34 @@ import (
 
 	"blitiri.com.ar/go/spf"
 	"github.com/chrj/smtpd"
+	"github.com/coronon/pingpong-mail/internal/util"
 	"github.com/emersion/go-msgauth/dkim"
 	"github.com/emersion/go-msgauth/dmarc"
 	"go.uber.org/zap"
 	"golang.org/x/net/publicsuffix"
 )
 
+var (
+	ErrFromHeaderInvalid = errors.New("<From:> header is invalid")
+	ErrSPFCantValidate   = errors.New("SPF can not be validated")
+	ErrDKIMCantValidate  = errors.New("DKIM can not be validated")
+	ErrDMARCFailed       = errors.New("DMARC failed or sender could not be validated")
+)
+
 // Fully validate DMARC compliance including alignment
-func checkDmarc(
+func CheckDmarc(
 	peer *smtpd.Peer,
 	env *smtpd.Envelope,
 	parsedMail *mail.Message,
 	senderDomain string,
 ) error {
 	// Determine sender <From:> header domain
-	fromHeaderParsed, err := getFromAddress(parsedMail.Header.Get("From"))
+	fromHeaderParsed, err := util.GetFromAddress(parsedMail.Header.Get("From"))
 	if err != nil {
 		zap.S().Debugw("Can't get <From:> address", "error", err)
 		return err
 	}
-	fromHeaderAddr := getDomainOrFallback(fromHeaderParsed, "")
+	fromHeaderAddr := util.GetDomainOrFallback(fromHeaderParsed, "")
 	if fromHeaderAddr == "" {
 		zap.S().Debugw("Can't get <From:> domain", "error", err)
 		return ErrFromHeaderInvalid
@@ -94,7 +103,7 @@ func getValidSPF(peer *smtpd.Peer, env *smtpd.Envelope) (string, error) {
 	//? Match return the domain that was validated
 	// This is a little ugly but streamlines the flow in `handler`
 	if spfResult == spf.Pass {
-		return getDomainOrFallback(env.Sender, peer.HeloName), nil
+		return util.GetDomainOrFallback(env.Sender, peer.HeloName), nil
 	}
 
 	return "", nil

@@ -1,4 +1,4 @@
-package main
+package config
 
 import (
 	"os"
@@ -6,6 +6,9 @@ import (
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v2"
 )
+
+// Current configuration of the application
+var Cnf Config
 
 type Config struct {
 	BindHost           string `yaml:"bind_host"`
@@ -23,7 +26,7 @@ type Config struct {
 }
 
 // Read and parse a yaml config at path
-func readConfig(path string) Config {
+func ReadConfig(path string) Config {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		zap.S().Fatalf("Error reading config: %v", err)

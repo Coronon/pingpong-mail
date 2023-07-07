@@ -1,6 +1,7 @@
-package main
+package util
 
 import (
+	"errors"
 	"net"
 	"net/mail"
 	"strings"
@@ -8,10 +9,15 @@ import (
 	"go.uber.org/zap"
 )
 
+var (
+	ErrFromHeaderMissing = errors.New("<From:> header is missing")
+	ErrFromHeaderInvalid = errors.New("<From:> header is invalid")
+)
+
 // Detmine the domain of an email sender or fallback
 // While technically an address could have multiple '@' signs, we will fallback
 // if there isn't exactly one!
-func getDomainOrFallback(address string, fallback string) string {
+func GetDomainOrFallback(address string, fallback string) string {
 	domainParts := strings.SplitN(address, "@", 2)
 	if len(domainParts) == 2 {
 		return domainParts[1]
@@ -22,7 +28,7 @@ func getDomainOrFallback(address string, fallback string) string {
 }
 
 // Get raw from address from RFC 5322 address
-func getFromAddress(fromHeader string) (string, error) {
+func GetFromAddress(fromHeader string) (string, error) {
 	// Check exists
 	if fromHeader == "" {
 		return "", ErrFromHeaderMissing
@@ -38,7 +44,7 @@ func getFromAddress(fromHeader string) (string, error) {
 }
 
 // Lookup MX records for `domain`, sorted by preference
-func getMXDomains(domain string) []*net.MX {
+func GetMXDomains(domain string) []*net.MX {
 	zap.S().Debugw("Looking up MX records", "domain", domain)
 
 	mxRecords, err := net.LookupMX(domain)
