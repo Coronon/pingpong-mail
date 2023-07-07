@@ -119,8 +119,8 @@ func checkAlignment(
 	validatedDomain string,
 	mode dmarc.AlignmentMode,
 ) bool {
-	// Validated address may not be empty
-	if validatedDomain == "" {
+	// Can't validate empty domains
+	if fromHeaderDomain == "" || validatedDomain == "" {
 		return false
 	}
 
