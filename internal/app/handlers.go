@@ -15,8 +15,8 @@ import (
 	"gopkg.in/gomail.v2"
 )
 
-// Check valid recipient (if limited)
-func RecipientChecker(peer smtpd.Peer, addr string) error {
+// Check valid recipient (if restricted)
+func CheckRecipient(peer smtpd.Peer, addr string) error {
 	if config.Cnf.RestrictInbox != "*" && addr != config.Cnf.RestrictInbox {
 		zap.S().Debugf("Received email for invalid inbox: %v", addr)
 		return fmt.Errorf("please send your test emails to: %v", config.Cnf.RestrictInbox)
