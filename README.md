@@ -32,6 +32,14 @@ solution for monitoring and testing email functionality.
 
 ## Installation
 
+### Docker 🐳
+
+```bash
+docker run -d --restart=always -p localhost:587:587 --name pingpong-mail coronon/pingpong-mail:latest
+```
+
+### Binary release
+
 To use PingPong-Mail, follow these steps:
 
 1. Download the PingPong-Mail executable for your operating system from the
@@ -52,7 +60,7 @@ Follow these steps to set up the configuration:
 ```yaml
 # Interface to listen on
 # Use 0.0.0.0 to receive connections from all interfaces
-bind_host: localhost
+bind_host: 0.0.0.0
 
 # Port to listen on
 # Most email submission traffic flows through port 587. Port 25 is mainly used
