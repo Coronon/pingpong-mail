@@ -31,9 +31,6 @@ func init() {
 func main() {
 	flag.Parse()
 
-	// Load configuration
-	config.Cnf = config.ReadConfig(*configPath)
-
 	var protocolLogger *log.Logger
 	// Setup verbose logging
 	if *isVerbose {
@@ -47,12 +44,22 @@ func main() {
 		protocolLogger = log.New(util.ZapLogWrapper{}, "", 0)
 	}
 
+	// Load configuration
+	config.Cnf = config.ReadConfig(*configPath)
+	config.LoadTLS()
+
 	// Start STMP server
 	server := &smtpd.Server{
+		WelcomeMessage: config.Cnf.SMTPWelcomeMessage,
+
 		MaxRecipients:  1,
+		MaxMessageSize: config.Cnf.MaxMessageSize,
+		TLSConfig:      config.TLSConfig,
+
 		RecipientChecker: app.CheckRecipient,
 		Handler:          app.HandleIncoming,
-		ProtocolLogger:   protocolLogger,
+
+		ProtocolLogger: protocolLogger,
 	}
 
 	bindAddr := fmt.Sprintf("%v:%v", config.Cnf.BindHost, config.Cnf.BindPort)

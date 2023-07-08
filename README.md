@@ -67,6 +67,33 @@ bind_host: 0.0.0.0
 # for relaying these days.
 bind_port: 587
 
+# Path to look for a TLS certificate (preferably fullchain)
+# The server will periodically reload the certificate to avoid any downtime
+# when certificates expire or change. Without a valid TLS configuration, the
+# SMTP server will not be able to encrypt traffic.
+# Absolute paths with symlinks are recommended.
+# You could setup certbot with letsencrypt (and possibly mount in a container):
+# /etc/letsencrypt/live/ping-pong.email/fullchain.pem
+tls_cert_path:
+
+# Path to look for the corresponding TLS key
+# For explanation see above.
+tls_key_path:
+
+# Seconds to cache a loaded TLS certificate for
+# Reloading the certificates periodically allows changing them without having to
+# restart the server itself, thus preventing downtime.
+# After the cache duration expires, the certificate is reloaded from the paths
+# above. Set to `0` to reload certificates with every request and `-1` to cache
+# them indefinitely.
+tls_cache_duration: 300
+
+# Minutes before TLS certificate expiry, the cache should be disabled
+# This is useful to always look for a new certificate when the current one is
+# about to expire. Optimally, this threshold should never be hit and only serve as
+# a safety precaution. The default is 48 hours.
+tls_cache_expiry_threshold: 1440
+
 # Welcome message for SMTP session upon connection from remote
 # Some providers expect the host name of the email server here
 smtp_welcome_message: PingPong email tester
