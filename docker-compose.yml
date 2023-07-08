@@ -2,12 +2,11 @@ version: "3"
 
 services:
   pingpong-mail:
-    image: pingpong-mail
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: deploy
+    image: coronon/pingpong-mail:latest
     volumes:
+      # Use local config file in container
       - ./pingpong.yml:/pingpong.yml
     ports:
-      - 127.0.0.1:5025:587
+      # Remove the leading '127.0.0.1' to expose the service to the internet
+      # Do not edit the last port number, as it's the container's port
+      - 127.0.0.1:587:587
