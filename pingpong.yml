@@ -30,6 +30,10 @@ restrict_inbox: check@ping-pong.email
 # All emails without this prefix will be rejected. Leave empty to disable.
 force_subject_prefix: "PING "
 
+# Maximum size of an email, after which a message is rejected in bytes.
+# The default is 1 MiB.
+max_message_size: 1048576
+
 # Forces all incoming mail to pass DMARC -> either SPF or DKIM
 # You should definitely leave this enabled when your instance is exposed to the
 # internet to not become a spam origin. People and bots could fake the sender

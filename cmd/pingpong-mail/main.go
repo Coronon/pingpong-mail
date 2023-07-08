@@ -49,7 +49,7 @@ func main() {
 
 	// Start STMP server
 	server := &smtpd.Server{
-		WelcomeMessage:   config.Cnf.SMTPWelcomeMessage,
+		MaxRecipients:  1,
 		RecipientChecker: app.CheckRecipient,
 		Handler:          app.HandleIncoming,
 		ProtocolLogger:   protocolLogger,

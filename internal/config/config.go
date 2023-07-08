@@ -29,6 +29,7 @@ type Config struct {
 	DeliveryPorts      []int  `yaml:"delivery_ports"`
 	RestrictInbox      string `yaml:"restrict_inbox"`
 	ForceSubjectPrefix string `yaml:"force_subject_prefix"`
+	MaxMessageSize     int    `yaml:"max_message_size"`
 	EnableDmarc        bool   `yaml:"enable_dmarc"`
 	ReplyAddress       string `yaml:"reply_address"`
 	ReplyFrom          string `yaml:"reply_from"`
