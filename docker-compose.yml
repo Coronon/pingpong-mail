@@ -6,7 +6,13 @@ services:
     volumes:
       # Use local config file in container
       - ./pingpong.yml:/pingpong.yml
+      # When using certbot with letsencrypt you could use the following for TLS
+      # Don't forget to configure TLS in pingpong.yml
+      # - /etc/letsencrypt/live/example.com/fullchain.pem:/fullchain.pem
+      # - /etc/letsencrypt/live/example.com/privkey.pem:/privkey.pem
     ports:
       # Remove the leading '127.0.0.1' to expose the service to the internet
       # Do not edit the last port number, as it's the container's port
       - 127.0.0.1:25:25
+    # To debug your instance uncomment the following line
+    # command: /pingpong-mail -c pingpong.yml -v
