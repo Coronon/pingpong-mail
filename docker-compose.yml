@@ -9,4 +9,4 @@ services:
     ports:
       # Remove the leading '127.0.0.1' to expose the service to the internet
       # Do not edit the last port number, as it's the container's port
-      - 127.0.0.1:587:587
+      - 127.0.0.1:25:25
