@@ -3,6 +3,8 @@ version: "3"
 services:
   pingpong-mail:
     image: coronon/pingpong-mail:latest
+    # You might want to run as root to access mounted TLS certificate files
+    # user: root
     volumes:
       # Use local config file in container
       - ./pingpong.yml:/pingpong.yml
