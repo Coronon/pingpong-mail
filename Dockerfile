@@ -35,7 +35,7 @@ COPY --from=build /etc/passwd /etc/passwd
 COPY --from=build /etc/group /etc/group
 
 # Copy basic runtime.
-COPY --from=build /usr/share/ca-certificates /usr/share/ca-certificates
+COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 
 # Copy built binary and config.
 COPY --from=build /go/src/app/pingpong-mail /pingpong-mail
