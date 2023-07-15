@@ -158,7 +158,7 @@ func handleAccepted(email *mail.Message, incomingRcptAddr string, outgoingRcptAd
 
 			//? If sending fails we won't retry as that could be seen as 'spammy'
 			//? We know that a connection was established as dialing didn't fail
-			err = util.SmtpExchange(response, conn, mx.Host, true)
+			err = mailyak.SmtpExchange(response, conn, mx.Host, true)
 			if err == nil {
 				zap.S().Infow("Sent reply", "to", outgoingRcptAddr)
 			} else {
