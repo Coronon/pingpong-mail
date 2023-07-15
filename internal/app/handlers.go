@@ -3,16 +3,19 @@ package app
 import (
 	"bytes"
 	"fmt"
+	"net"
 	"net/mail"
 	"strings"
 
 	"github.com/chrj/smtpd"
+	"github.com/domodwyer/mailyak/v3"
+	"github.com/google/uuid"
+	"go.uber.org/zap"
+
 	"github.com/coronon/pingpong-mail/internal/config"
 	"github.com/coronon/pingpong-mail/internal/dmarc"
 	"github.com/coronon/pingpong-mail/internal/reply"
 	"github.com/coronon/pingpong-mail/internal/util"
-	"go.uber.org/zap"
-	"gopkg.in/gomail.v2"
 )
 
 // Check valid recipient (if restricted)
@@ -107,12 +110,21 @@ func handleAccepted(email *mail.Message, incomingRcptAddr string, outgoingRcptAd
 	body := reply.BuildReplyBody(email)
 	zap.S().Debugw("Prepared response", "subject", subject, "body", body)
 
+	// Build Message-ID
+	msgUUID, err := uuid.NewRandom()
+	if err != nil {
+		zap.S().Debugw("Could not generate random UUID for Message-ID", "error", err)
+	}
+	msgID := fmt.Sprintf("%v@%v", msgUUID, config.Cnf.ServerName)
+
 	// Build response mail
-	m := gomail.NewMessage()
-	m.SetHeader("From", replyFrom)
-	m.SetHeader("To", incomingRcptAddr)
-	m.SetHeader("Subject", subject)
-	m.SetBody("text/plain", body)
+	response := mailyak.New("", nil)
+	response.LocalName(config.Cnf.ServerName)
+	response.SetHeader("Message-ID", msgID)
+	response.From(replyFrom)
+	response.To(incomingRcptAddr)
+	response.Subject(subject)
+	response.Plain().Set(body)
 
 	// Find MX server
 	outgoingRcptDomain := util.GetDomainOrFallback(outgoingRcptAddr, "")
@@ -136,18 +148,17 @@ func handleAccepted(email *mail.Message, incomingRcptAddr string, outgoingRcptAd
 				"port", port,
 			)
 
-			d := gomail.Dialer{Host: mx.Host, Port: port, LocalName: config.Cnf.ServerName}
-			sender, err := d.Dial()
+			conn, err := net.Dial("tcp", fmt.Sprintf("%v:%v", mx.Host, port))
 			if err != nil {
 				zap.S().Debugw("Could not dial", "error", err)
 				// Attempt other mx:port combination
 				continue
 			}
+			defer func() { _ = conn.Close() }()
 
 			//? If sending fails we won't retry as that could be seen as 'spammy'
 			//? We know that a connection was established as dialing didn't fail
-			err = sender.Send(replyFrom, recipients, m)
-			sender.Close()
+			err = util.SmtpExchange(response, conn, mx.Host, true)
 			if err == nil {
 				zap.S().Infow("Sent reply", "to", outgoingRcptAddr)
 			} else {
