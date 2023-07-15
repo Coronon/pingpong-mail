@@ -115,7 +115,7 @@ func handleAccepted(email *mail.Message, incomingRcptAddr string, outgoingRcptAd
 	if err != nil {
 		zap.S().Debugw("Could not generate random UUID for Message-ID", "error", err)
 	}
-	msgID := fmt.Sprintf("%v@%v", msgUUID, config.Cnf.ServerName)
+	msgID := fmt.Sprintf("<%s@%s>", msgUUID, config.Cnf.ServerName)
 
 	// Build response mail
 	response := mailyak.New("", nil)
