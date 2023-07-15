@@ -107,10 +107,13 @@ server_name: mail.ping-pong.email
 delivery_ports: [587, 2525, 25]
 
 # Restricts addresses that can be used as the `RCPT TO:` (RFC5321)
-# When using the wildcard `*` to allow any recipient address, beware that some
-# services might consider you an open relay for that. Also ensure that you
-# specify `reply_address` to not accidentally impersonate anyone!
-restrict_inbox: check@ping-pong.email
+# The below value will be treated as a regular expression, so be sure to escape
+# any characters with a special meaning, e.g. '.' -> '\.'.
+# When using wildcards to allow any recipient domain, beware that some services
+# might consider you an open relay for that. Also ensure that you specify
+# `reply_address` to not accidentally impersonate anyone!
+# If left empty, no checks will be applied and all mail accepted.
+restrict_inbox: ^.+@ping-pong\.email$
 
 # Force some string at the beginning of received mails subjects
 # Useful when you don't want to service automatic spam emails.

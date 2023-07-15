@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"os"
+	"regexp"
 
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v2"
@@ -10,6 +11,7 @@ import (
 
 // Uniform error messages used throughout the application
 var (
+	ErrInvalidRcpt       = errors.New("Test emails are not accepted for that inbox")
 	ErrCantParseBody     = errors.New("Could not parse message body")
 	ErrFromHeaderMissing = errors.New("<From:> header is missing")
 	ErrFromHeaderInvalid = errors.New("<From:> header is invalid")
@@ -20,6 +22,7 @@ var (
 
 // Current configuration of the application
 var Cnf Config
+var RestrictInboxRegex *regexp.Regexp
 
 type Config struct {
 	BindHost                string `yaml:"bind_host"`
@@ -53,6 +56,17 @@ func ReadConfig(path string) Config {
 	err = yaml.Unmarshal(data, &c)
 	if err != nil {
 		zap.S().Fatalf("Error parsing config: %v", err)
+	}
+
+	// Handle RestrictInboxRegex
+	if c.RestrictInbox != "" {
+		RestrictInboxRegex, err = regexp.Compile(c.RestrictInbox)
+		if err != nil {
+			zap.S().Fatalw("Error parsing inbox restriction regex",
+				"restrict_inbox", c.RestrictInbox,
+				"error", err,
+			)
+		}
 	}
 
 	return c
