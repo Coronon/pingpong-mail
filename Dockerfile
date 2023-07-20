@@ -18,6 +18,7 @@ WORKDIR /go/src/app
 # Resolve app dependencies.
 COPY go.mod ./
 COPY go.sum ./
+COPY vendored vendored
 RUN set -eux; go mod download; go mod verify
 
 # Copy app source code (except anything in .dockerignore).
