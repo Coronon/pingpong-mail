@@ -123,7 +123,7 @@ func handleAccepted(email *mail.Message, incomingRcptAddr string, outgoingRcptAd
 	response.LocalName(config.Cnf.ServerName)
 	response.SetHeader("Message-ID", msgID)
 	response.From(replyFrom)
-	response.To(incomingRcptAddr)
+	response.To(outgoingRcptAddr)
 	response.Subject(subject)
 	response.Plain().Set(body)
 
