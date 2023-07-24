@@ -19,7 +19,11 @@ validation, including alignment checks, you don't become a spam relay.
 ## Public instance
 
 If you simply want to try out PingPong-Mail without hosting it yourself, you can
-send emails to `check@ping-pong.email`.
+send emails to:
+
+```txt
+check@ping-pong.email
+```
 
 There are no content restrictions to your messages other than passing DMARC
 verification and being smaller than 1 MiB in size. Other than firewall logs, the
