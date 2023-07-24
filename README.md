@@ -9,11 +9,26 @@ validation, including alignment checks, you don't become a spam relay.
 ## Table of Contents
 
 - [Introduction](#introduction)
+- [Public instance](#public-instance)
 - [Installation](#installation)
 - [Configuration](#configuration)
 - [Usage](#usage)
 - [Contributing](#contributing)
 - [License](#license)
+
+## Public instance
+
+If you simply want to try out PingPong-Mail without hosting it yourself, you can
+send emails to `check@ping-pong.email`.
+
+There are no content restrictions to your messages other than passing DMARC
+verification and being smaller than 1 MiB in size. Other than firewall logs, the
+server only logs the recipient addresses of successfully outgoing messages to
+prevent inadvertently becoming a spam host. No message contents are stored.
+
+**DISCLAIMER: I am not responsible for any response subjects as they are directly
+controlled by incoming messages.**
+
 
 ## Introduction
 
