@@ -54,7 +54,7 @@ solution for monitoring and testing email functionality.
 ### Docker 🐳
 
 ```bash
-docker run -d --restart=always -p localhost:587:587 --name pingpong-mail coronon/pingpong-mail:latest
+docker run -d --restart=always -p localhost:25:25 --name pingpong-mail coronon/pingpong-mail:latest
 ```
 
 ### Binary release
@@ -77,14 +77,14 @@ Follow these steps to set up the configuration:
 2. Customize the configuration options according to your requirements. 
 
 ```yaml
-# Interface to listen on
+# Interface# Interface to listen on
 # Use 0.0.0.0 to receive connections from all interfaces
 bind_host: 0.0.0.0
 
 # Port to listen on
-# Most email submission traffic flows through port 587. Port 25 is mainly used
-# for relaying these days.
-bind_port: 587
+# Most email traffic between servers flows through port 25. Port 587 is mainly
+# used for submission from client -> server and should require authentication.
+bind_port: 25
 
 # Path to look for a TLS certificate (preferably fullchain)
 # The server will periodically reload the certificate to avoid any downtime
@@ -123,7 +123,7 @@ server_name: mail.ping-pong.email
 
 # Ports to try to deliver replies to in order
 # Should probably be left with the default
-delivery_ports: [587, 2525, 25]
+delivery_ports: [25, 2525, 587]
 
 # Restricts addresses that can be used as the `RCPT TO:` (RFC5321)
 # The below value will be treated as a regular expression, so be sure to escape
@@ -175,7 +175,6 @@ reply_message: |
   Thank you for using ping-pong.email
 
   Time: {TIME}
-
 ```
 
 3. Save the configuration file to disk.
