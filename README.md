@@ -8,13 +8,17 @@ validation, including alignment checks, you don't become a spam relay.
 
 ## Table of Contents
 
-- [Introduction](#introduction)
-- [Public instance](#public-instance)
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [Usage](#usage)
-- [Contributing](#contributing)
-- [License](#license)
+- [PingPong-Mail](#pingpong-mail)
+  - [Table of Contents](#table-of-contents)
+  - [Public instance](#public-instance)
+  - [Introduction](#introduction)
+  - [Installation](#installation)
+    - [Docker 🐳](#docker-)
+    - [Binary](#binary)
+  - [Configuration](#configuration)
+  - [Usage](#usage)
+  - [Contributing](#contributing)
+  - [License](#license)
 
 ## Public instance
 
@@ -57,14 +61,20 @@ solution for monitoring and testing email functionality.
 docker run -d --restart=always -p localhost:25:25 --name pingpong-mail coronon/pingpong-mail:latest
 ```
 
-### Binary release
+### Binary
 
 To use PingPong-Mail, follow these steps:
 
-1. Download the PingPong-Mail executable for your operating system from the
-[releases](https://github.com/Coronon/pingpong-email/releases) page.
+1. Download the PingPong-Mail source code.
 
-2. Place the executable in a directory of your choice.
+2. Build the project using the following command (optimized, stripped and statically linked):
+
+```bash
+CGO_ENABLED=0 go build -ldflags="-w -s" -o pingpong-mail ./cmd/pingpong-mail
+```
+
+3. Place the executable in a directory of your choice along with the sample
+   configuration file `pingpong.yml` (see below).
 
 ## Configuration
 
