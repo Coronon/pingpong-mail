@@ -50,6 +50,7 @@ func main() {
 
 	// Start STMP server
 	server := &smtpd.Server{
+		Hostname:       config.Cnf.ServerName,
 		WelcomeMessage: config.Cnf.SMTPWelcomeMessage,
 
 		MaxRecipients:  1,
