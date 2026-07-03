@@ -1,6 +1,6 @@
 module github.com/coronon/pingpong-mail
 
-go 1.24.0
+go 1.25.0
 
 require (
 	blitiri.com.ar/go/spf v1.5.1
@@ -9,7 +9,7 @@ require (
 	github.com/emersion/go-msgauth v0.6.8
 	github.com/google/uuid v1.6.0
 	go.uber.org/zap v1.27.0
-	golang.org/x/net v0.47.0
+	golang.org/x/net v0.55.0
 	gopkg.in/yaml.v2 v2.4.0
 )
 
@@ -17,5 +17,5 @@ replace github.com/domodwyer/mailyak/v3 => ./vendored/github.com/domodwyer/maily
 
 require (
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/crypto v0.45.0 // indirect
+	golang.org/x/crypto v0.51.0 // indirect
 )
