@@ -17,5 +17,5 @@ replace github.com/domodwyer/mailyak/v3 => ./vendored/github.com/domodwyer/maily
 
 require (
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/crypto v0.51.0 // indirect
+	golang.org/x/crypto v0.52.0 // indirect
 )
